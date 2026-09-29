@@ -18,6 +18,9 @@ unset CC CXX # meson wants these unset
 
 # libplacebo は mpv 0.41 から必須依存になったため、-Dlibplacebo を渡す
 # 選択肢は無い (vo_gpu_next.c が無条件に sources に入る)。
+# aaudio は mpv 0.41 で追加されたが、NDK 25.2 の AAudio.h に
+# AAUDIO_FORMAT_IEC61937 が無くビルドが落ちる。media_kit 側は Android で
+# ao=opensles をハードコードしており AAudio は使わないので切って構わない。
 meson setup $build --cross-file "$prefix_dir"/crossfile.txt \
 	--prefer-static \
 	--default-library shared \
@@ -27,6 +30,7 @@ meson setup $build --cross-file "$prefix_dir"/crossfile.txt \
  	-Dcplayer=false \
 	-Diconv=disabled \
 	-Dvulkan=disabled \
+	-Daaudio=disabled \
  	-Dmanpage-build=disabled
 
 ninja -C $build -j$cores
