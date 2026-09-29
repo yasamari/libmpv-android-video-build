@@ -27,6 +27,9 @@ mkdir -p deps && cd deps
 # libx264
 [ ! -d libx264 ] && git clone --depth 1 https://code.videolan.org/videolan/x264.git --branch master libx264
 
+# libaribcaption
+[ ! -d aribcaption ] && git clone --depth 1 --branch v$v_aribcaption https://github.com/xqq/libaribcaption.git aribcaption
+
 # ffmpeg
 [ ! -d ffmpeg ] && git clone --depth 1 --branch n$v_ffmpeg https://github.com/FFmpeg/FFmpeg.git ffmpeg
 

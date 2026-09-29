@@ -77,6 +77,8 @@ cpuflags=
 	\
 	--enable-libxml2 \
 	\
+	--enable-libaribcaption \
+	\
 	--enable-avutil \
 	--enable-avcodec \
 	--enable-avfilter \

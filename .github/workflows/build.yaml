@@ -29,6 +29,12 @@ jobs:
           java-version: 17
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          # libaribcaption requires cmake_minimum_required(3.28),
+          # the runner ships 3.22.
+          cmake-version: '3.31.6'
       - name: Symlink SDK
         working-directory: ./buildscripts
         run: |

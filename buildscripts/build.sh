@@ -7,6 +7,7 @@ cleanbuild=0
 nodeps=0
 target=mpv
 archs=(armv7l arm64 x86 x86_64)
+declare -A _built_deps=()
 
 getdeps () {
 	varname="dep_${1//-/_}[*]"
@@ -100,6 +101,12 @@ build () {
 		printf >&2 '\e[1;31m%s\e[m\n' "Target $1 not found"
 		return 1
 	fi
+	# Several targets share a dependency (libaribcaption and libass both need
+	# freetype) and most build scripts cannot be re-run over an existing build
+	# dir, so remember what has been built. Reset per arch by loadarch.
+	if [ -n "${_built_deps[$1]:-}" ]; then
+		return 0
+	fi
 	if [ $nodeps -eq 0 ]; then
 		printf >&2 '\e[1;34m%s\e[m\n' "Preparing $1..."
 		local deps=$(getdeps $1)
@@ -116,6 +123,8 @@ build () {
 	[ $cleanbuild -eq 1 ] && $BUILDSCRIPT clean
     $BUILDSCRIPT build
     popd
+
+	_built_deps[$1]=1
 }
 
 usage () {
@@ -152,11 +161,13 @@ done
 
 if [ -z $arch ]; then
   for arch in ${archs[@]}; do
+    _built_deps=()
     loadarch $arch
     setup_prefix
     build $target
   done
 else
+  _built_deps=()
   loadarch $arch
   setup_prefix
   build $target

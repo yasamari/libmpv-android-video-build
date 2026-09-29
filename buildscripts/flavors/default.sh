@@ -76,6 +76,8 @@ cpuflags=
 	\
 	--enable-libxml2 \
 	\
+	--enable-libaribcaption \
+	\
 	--enable-avutil \
 	--enable-avcodec \
 	--enable-avfilter \
@@ -132,6 +134,7 @@ cpuflags=
 	\
 	--enable-decoder=ssa \
 	--enable-decoder=ass \
+	--enable-decoder=arib_caption \
 	--enable-decoder=dvbsub \
 	--enable-decoder=dvdsub \
 	--enable-decoder=srt \

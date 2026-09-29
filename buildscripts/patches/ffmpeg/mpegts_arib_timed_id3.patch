@@ -1,0 +1,171 @@
+diff --git a/libavformat/mpegts.c b/libavformat/mpegts.c
+index 3209262..f86cf82 100644
+--- a/libavformat/mpegts.c
++++ b/libavformat/mpegts.c
+@@ -44,6 +44,7 @@
+ #include "demux.h"
+ #include "mpeg.h"
+ #include "isom.h"
++#include "id3v2.h"
+ #if CONFIG_ICONV
+ #include <iconv.h>
+ #endif
+@@ -1010,9 +1011,118 @@ static void new_data_packet(const uint8_t *buffer, int len, AVPacket *pkt)
+     pkt->size = len;
+ }
+ 
++/**
++ * Extract an ARIB STD-B24 caption payload carried inside an ID3 timed
++ * metadata PES packet (as produced by tsreadex and friends, which wrap the
++ * caption PES in an ID3v2 PRIV frame owned by "aribb24.js").
++ *
++ * On success the packet payload is replaced by the raw ARIB data, the stream
++ * is re-tagged as ARIB caption and 1 is returned.
++ *
++ * A payload that is not an ARIB caption is dropped, not forwarded: the stream
++ * is re-tagged on the first caption packet and stays tagged from then on, so
++ * forwarding the untouched ID3 tag would hand "ID3..." to libaribcaption, which
++ * rejects it with "Invalid data_identifier". FFERROR_REDO tells the framework
++ * to read the next packet instead.
++ *
++ * @return 1 if the packet now carries ARIB caption data,
++ *         FFERROR_REDO if the packet is not an ARIB caption and must be
++ *                      dropped, or 0 if the packet is not an ARIB stream at all
++ *         (a plain timed ID3 packet, left untouched).
++ */
++static int timed_id3_extract_arib(PESContext *pes, AVPacket *pkt)
++{
++    FFIOContext id3_buf;
++    ID3v2ExtraMeta *extra_meta = NULL;
++    ID3v2ExtraMeta *cur;
++    AVDictionary *metadata = NULL;
++    AVBufferRef *buf = NULL;
++    int ret = 0;
++
++    if (pkt->size < ID3v2_HEADER_SIZE ||
++        !ff_id3v2_match(pkt->data, ID3v2_DEFAULT_MAGIC))
++        return 0;
++
++    ffio_init_read_context(&id3_buf, pkt->data, pkt->size);
++    ff_id3v2_read_dict(&id3_buf.pub, &metadata,
++                      ID3v2_DEFAULT_MAGIC, &extra_meta);
++
++    for (cur = extra_meta; cur; cur = cur->next) {
++        ID3v2ExtraMetaPRIV *priv;
++
++        if (strcmp(cur->tag, "PRIV"))
++            continue;
++
++        priv = &cur->data.priv;
++        if (strcmp((const char *)priv->owner, "aribb24.js") ||
++            priv->datasize < 1)
++            continue;
++
++        /* 0x80 is caption, 0x81 is superimpose. libaribcaption is set up for
++         * ARIBCC_CAPTIONTYPE_CAPTION and rejects superimpose with a
++         * "data_identifier mismatch" error, so only caption is usable. */
++        if (priv->data[0] != 0x80)
++            break;
++
++        buf = av_buffer_alloc(priv->datasize + AV_INPUT_BUFFER_PADDING_SIZE);
++        if (!buf) {
++            ret = AVERROR(ENOMEM);
++            goto end;
++        }
++
++        memcpy(buf->data, priv->data, priv->datasize);
++        memset(buf->data + priv->datasize, 0,
++               AV_INPUT_BUFFER_PADDING_SIZE);
++
++        av_buffer_unref(&pkt->buf);
++        pkt->buf = buf;
++        buf = NULL;
++        pkt->data = pkt->buf->data;
++        pkt->size = priv->datasize;
++
++        {
++            FFStream *const sti = ffstream(pes->st);
++            int video_index;
++
++            pes->st->codecpar->codec_type = AVMEDIA_TYPE_SUBTITLE;
++            pes->st->codecpar->codec_id   = AV_CODEC_ID_ARIB_CAPTION;
++            pes->st->codecpar->profile    = AV_PROFILE_ARIB_PROFILE_A;
++            pes->st->disposition |= AV_DISPOSITION_DEFAULT;
++            av_dict_set(&pes->st->metadata, "language", "jpn",
++                        AV_DICT_DONT_OVERWRITE);
++
++            video_index = av_find_best_stream(pes->stream, AVMEDIA_TYPE_VIDEO,
++                                               -1, 1, NULL, 0);
++            if (video_index >= 0) {
++                AVStream *video_st = pes->stream->streams[video_index];
++                pes->st->codecpar->width  = video_st->codecpar->width;
++                pes->st->codecpar->height = video_st->codecpar->height;
++            }
++
++            sti->need_parsing = AVSTREAM_PARSE_NONE;
++            sti->need_context_update = 1;
++        }
++
++        ret = 1;
++        goto end;
++    }
++
++    /* An "aribb24.js" payload that is not a caption (superimpose, or anything
++     * else) is not decodable as ARIB caption; drop it. */
++    if (pes->st->codecpar->codec_id == AV_CODEC_ID_ARIB_CAPTION)
++        ret = FFERROR_REDO;
++
++end:
++    av_buffer_unref(&buf);
++    ff_id3v2_free_extra_meta(&extra_meta);
++    av_dict_free(&metadata);
++    return ret;
++}
++
+ static int new_pes_packet(PESContext *pes, AVPacket *pkt)
+ {
+     uint8_t *sd;
++    int arib;
+ 
+     av_packet_unref(pkt);
+ 
+@@ -1026,13 +1136,22 @@ static int new_pes_packet(PESContext *pes, AVPacket *pkt)
+         av_log(pes->stream, AV_LOG_WARNING, "PES packet size mismatch\n");
+         pes->flags |= AV_PKT_FLAG_CORRUPT;
+     }
+-    memset(pkt->data + pkt->size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
+ 
+     // Separate out the AC3 substream from an HDMV combined TrueHD/AC3 PID
+     if (pes->sub_st && pes->stream_type == 0x83 && pes->extended_stream_id == 0x76)
+         pkt->stream_index = pes->sub_st->index;
+     else
+         pkt->stream_index = pes->st->index;
++
++    arib = timed_id3_extract_arib(pes, pkt);
++    if (arib < 0 && arib != FFERROR_REDO)
++        return arib;
++
++    /* A re-tagged ARIB packet already owns a padded buffer, and a packet
++     * that is about to be dropped does not need the padding at all. */
++    if (!arib)
++        memset(pkt->data + pkt->size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++
+     pkt->pts = pes->pts;
+     pkt->dts = pes->dts;
+     /* store position of first TS packet of this PES packet */
+@@ -1047,6 +1166,15 @@ static int new_pes_packet(PESContext *pes, AVPacket *pkt)
+         return AVERROR(ENOMEM);
+     *sd = pes->stream_id;
+ 
++    if (arib == FFERROR_REDO) {
++        av_packet_unref(pkt);
++        /* reset_pes_packet_state() above only clears data_index; without this
++         * the rest of this PES would be accumulated into a fresh buffer and
++         * handed to the ARIB decoder as a truncated ID3 frame. */
++        pes->state = MPEGTS_SKIP;
++        return FFERROR_REDO;
++    }
++
+     return 0;
+ }
+ 

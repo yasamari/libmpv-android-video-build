@@ -13,7 +13,8 @@ v_freetype=2-13-0
 v_mbedtls=3.4.0
 v_dav1d=1.2.0
 v_libxml2=2.10.3
-v_ffmpeg=6.0
+v_aribcaption=1.1.2
+v_ffmpeg=7.0
 v_mpv=78d43740f52db817d98bcf24fb30a76ab6fa13ff
 v_libogg=1.3.5
 v_libvorbis=1.3.7
@@ -26,10 +27,14 @@ v_libvpx=1.13
 dep_mbedtls=()
 dep_dav1d=()
 dep_libvorbis=(libogg)
+# libaribcaption's bitmap renderer needs freetype. The renderer is not optional:
+# ffmpeg's arib_caption decoder is used with `sub-lavc-o=sub_type=bitmap`,
+# which goes through libaribcaption's own renderer.
+dep_aribcaption=(freetype)
 if [ -n "${ENCODERS_GPL+x}" ]; then
-	dep_ffmpeg=(mbedtls dav1d libxml2 libvorbis libvpx libx264)
+	dep_ffmpeg=(mbedtls dav1d libxml2 aribcaption libvorbis libvpx libx264)
 else
-	dep_ffmpeg=(mbedtls dav1d libxml2)
+	dep_ffmpeg=(mbedtls dav1d libxml2 aribcaption)
 fi
 dep_freetype2=()
 dep_fribidi=()
