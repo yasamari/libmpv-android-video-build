@@ -52,8 +52,14 @@ Shaderc sources are provided by the NDK.
 see <ndk>/sources/third_party/shaderc
 HEREDOC
 
+# libplacebo
+# 3rdparty/{glad,Vulkan-Headers,fast_float} を submodule として抱えており、
+# git clone だけでは configure が "glad was not found" で落ちる。
+# (demos/ 以下の submodule も一緒に取られるが、-Ddemos=false なので不要)
+[ ! -d libplacebo ] && git clone --depth 1 --branch v$v_libplacebo --recurse-submodules https://github.com/haasn/libplacebo.git libplacebo
+
 # mpv
-[ ! -d mpv ] && git clone https://github.com/mpv-player/mpv.git mpv && cd mpv && git reset --hard 78d43740f52db817d98bcf24fb30a76ab6fa13ff && cd ..
+[ ! -d mpv ] && git clone https://github.com/mpv-player/mpv.git mpv && cd mpv && git reset --hard $v_mpv && cd ..
 
 # fftools_ffi
 [ ! -d fftools_ffi ] && git clone https://github.com/moffatman/fftools-ffi.git fftools_ffi && cd fftools_ffi && git reset --hard 9b0d4da026d9c830702ec043c1f1f98d407025af && cd ..

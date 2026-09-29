@@ -15,7 +15,10 @@ v_dav1d=1.2.0
 v_libxml2=2.10.3
 v_aribcaption=1.1.2
 v_ffmpeg=6.1
-v_mpv=78d43740f52db817d98bcf24fb30a76ab6fa13ff
+v_mpv=41f6a645068483470267271e1d09966ca3b9f413
+# mpv 0.41 の gpu-next (vo_gpu_next.c) は無条件に sources に入るため、
+# libplacebo は必須依存になった (旧 mpv の -Dlibplacebo=disabled は使えない)。
+v_libplacebo=6.338.2
 v_libogg=1.3.5
 v_libvorbis=1.3.7
 v_libvpx=1.13
@@ -40,10 +43,11 @@ dep_freetype2=()
 dep_fribidi=()
 dep_harfbuzz=()
 dep_libass=(freetype fribidi harfbuzz)
+dep_libplacebo=()
 dep_lua=()
 dep_shaderc=()
 if [ -n "${ENCODERS_GPL+x}" ]; then
-	dep_mpv=(ffmpeg libass fftools_ffi)
+	dep_mpv=(ffmpeg libass libplacebo fftools_ffi)
 else
-	dep_mpv=(ffmpeg libass)
+	dep_mpv=(ffmpeg libass libplacebo)
 fi

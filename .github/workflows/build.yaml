@@ -35,6 +35,13 @@ jobs:
           # libaribcaption requires cmake_minimum_required(3.28),
           # the runner ships 3.22.
           cmake-version: '3.31.6'
+      - name: Setup Python (libplacebo)
+        run: |
+          # libplacebo pre-processes its GLSL shaders with a jinja2 template,
+          # so both packages are needed to build it.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends python3-jinja2
+          python3 -c 'import jinja2, markupsafe'
       - name: Symlink SDK
         working-directory: ./buildscripts
         run: |

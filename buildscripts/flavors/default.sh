@@ -134,7 +134,7 @@ cpuflags=
 	\
 	--enable-decoder=ssa \
 	--enable-decoder=ass \
-	--enable-decoder=arib_caption \
+	--enable-decoder=libaribcaption \
 	--enable-decoder=dvbsub \
 	--enable-decoder=dvdsub \
 	--enable-decoder=srt \
