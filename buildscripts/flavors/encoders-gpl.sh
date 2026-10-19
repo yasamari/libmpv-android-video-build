@@ -55,7 +55,7 @@ cpuflags=
 	--disable-postproc \
 	--disable-programs \
 	--disable-gray \
-	--disable-swscale-alpha \
+	--enable-swscale-alpha \
 	\
 	--enable-jni \
 	--enable-bsfs \
